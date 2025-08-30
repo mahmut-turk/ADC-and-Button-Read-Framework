@@ -13,10 +13,10 @@ This project reads ADC data from an Arduino and displays it in real-time on a Wi
 - Y-axis range: 0–1023  
 
 ## Requirements
-- Visual Studio 2019 or later  
+- Visual Studio Code 2019 or later to program the Arduino Uno
 - .NET Framework 4.7.2+  
 - NuGet package: `RJCP.IO.Ports` (for serial communication)  
-- Arduino connected via a COM port  
+- Arduino connected via a COM port
 
 ## Setup & Usage
 1. Open the project in Visual Studio.  

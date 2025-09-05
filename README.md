@@ -23,4 +23,4 @@ This project reads ADC data from an Arduino and displays it in real-time on a Wi
 2. Install NuGet packages (RJCP.IO.Ports).  
 3. Connect your Arduino and specify the correct COM port in the `OpenSerialPort` function:  
    ```csharp
-   OpenSerialPort("COM7", 9600);
+   OpenSerialPort("COM10", 115200);

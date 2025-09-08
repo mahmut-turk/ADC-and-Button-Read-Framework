@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq.Expressions;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
 
@@ -37,10 +38,10 @@ namespace ilkADCreadFramework
             // create a Chart
             chart = new Chart
             {
-                Dock = DockStyle.Top,
+                //Dock = DockStyle.Top,
                 Height = 400,
                 Width = 1600,
-                //Location = new Point(10, 40),
+                Location = new Point(10, 40),
             };
             chart.Anchor = AnchorStyles.Left;
             ChartArea area = new ChartArea("MainArea");
@@ -61,7 +62,7 @@ namespace ilkADCreadFramework
             this.Controls.Add(chart);
 
             // try to open the COM port
-            OpenSerialPort("COM10", 115200);
+            OpenSerialPort("COM10", 921600);
             
         }
   
@@ -93,7 +94,7 @@ namespace ilkADCreadFramework
                         this.Invoke((MethodInvoker)(() =>
                         {
                             statusLabel.Text = $"Port {portName} ist opened succesfull";
-                            Thread.Sleep(1000);
+                            
                         }));
                     }
                     catch (Exception ex)
@@ -117,48 +118,60 @@ namespace ilkADCreadFramework
             });
         }
 
-        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)             
+        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             try
             {
                 if (serialPort != null && serialPort.IsOpen)
                 {
-                    string line = serialPort.ReadLine();
-                    
-                    if (int.TryParse(line, out int value))
+                    string line = serialPort.ReadLine().Trim();
+
+                    this.Invoke((MethodInvoker)(() =>
                     {
-                        int scaledValue = value * 1023 / 4095; // Scale 0-4095 to 0-1023
-                        value = scaledValue;
-                        this.Invoke((MethodInvoker)delegate
+                        if (line.StartsWith("ADC:"))
                         {
-                            int nextX = chart.Series["ADC"].Points.Count;
-                            chart.Series["ADC"].Points.AddXY(nextX, value);
-                            if (value > 500)
-                                chart.Series["ADC"].Points[nextX].Color = Color.Red;
-                            else if(value>400 && value<501)
-                                chart.Series["ADC"].Points[nextX].Color = Color.Yellow;
-                            ChartArea area = chart.ChartAreas["MainArea"];
-                            area.AxisX.Minimum = Math.Max(0, nextX - 100);
-                            area.AxisX.Maximum = nextX;
+                            string payload = line.Substring(4);           // takes 4. index and more (index starts from zero)
+                            if (int.TryParse(payload, out int value))
+                            {
+                                int scaledValue = value * 1023 / 4095;    // ESP32 works with 12 bit ADC, converted to 10 bit
 
+                                int nextX = chart.Series["ADC"].Points.Count;
+                                chart.Series["ADC"].Points.AddXY(nextX, scaledValue);
 
-                            last20Values.Enqueue(value);
-                            if (last20Values.Count > 20)
-                                last20Values.Dequeue();
+                                if (scaledValue > 500)
+                                    chart.Series["ADC"].Points[nextX].Color = Color.Red;
+                                else if (scaledValue > 400 && scaledValue <= 500)
+                                    chart.Series["ADC"].Points[nextX].Color = Color.Yellow;
 
-                            // --- ListBox'ı güncelle ---
-                            listBox1.Items.Clear();
-                            foreach (var v in last20Values)
-                                listBox1.Items.Add(v);
-                            listBox1.TopIndex = listBox1.Items.Count - 1;
+                                // Last 100 chart points
+                                var area = chart.ChartAreas["MainArea"];
+                                area.AxisX.Minimum = Math.Max(0, nextX - 100);
+                                area.AxisX.Maximum = nextX;
 
-                        });
-                    }
+                                // ListBox last 20 values
+                                last20Values.Enqueue(scaledValue);
+                                if (last20Values.Count > 20) last20Values.Dequeue();
+
+                                listBox1.Items.Clear();                          // please add a listbox1 to the form
+                                foreach (var v in last20Values) listBox1.Items.Add(v);    
+                                listBox1.TopIndex = listBox1.Items.Count - 1;    // scrolled to the end
+                            }
+                        }
+                        else if (line.StartsWith("BTN:"))
+                        {
+                            string payload = line.Substring(4);             // takes 4. index and more (index starts from zero)
+                            listBox2.Items.Add(payload);                    // please add a listbox2 to the form
+                            listBox2.TopIndex = listBox2.Items.Count - 1;   // scrolled to the end
+                        }
+                    }));
                 }
             }
-            catch { }
-            
+            catch (Exception ex)
+            {
+                MessageBox.Show("Serial read error: " + ex.Message);
+            }
         }
+
 
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -166,14 +179,14 @@ namespace ilkADCreadFramework
             if (serialPort != null)
             {
                 try { serialPort.Close(); } catch { }
-                serialPort.Dispose();
+                serialPort.Dispose();   // free all resources
             }
             base.OnFormClosing(e);
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            this.Close();
+            this.Close();     // button1 located on the form to close the application (location 1650;50) (size 240;80)
         }
     }
 }

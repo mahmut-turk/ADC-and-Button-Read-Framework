@@ -62,7 +62,7 @@ namespace ilkADCreadFramework
             this.Controls.Add(chart);
 
             // try to open the COM port
-            OpenSerialPort("COM10", 921600);
+            OpenSerialPort("COM10", 115200);
             
         }
   
@@ -124,44 +124,51 @@ namespace ilkADCreadFramework
             {
                 if (serialPort != null && serialPort.IsOpen)
                 {
-                    string line = serialPort.ReadLine().Trim();
+                    string data = serialPort.ReadExisting(); // tüm mevcut veriyi al
+                    string[] lines = data.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
                     this.Invoke((MethodInvoker)(() =>
                     {
-                        if (line.StartsWith("ADC:"))
+                        foreach (var line in lines)
                         {
-                            string payload = line.Substring(4);           // takes 4. index and more (index starts from zero)
-                            if (int.TryParse(payload, out int value))
+                            if (line.StartsWith("ADC:"))
                             {
-                                int scaledValue = value * 1023 / 4095;    // ESP32 works with 12 bit ADC, converted to 10 bit
+                                string ADCvalue = line.Substring(4).Trim();
+                                if (int.TryParse(ADCvalue, out int value))
+                                {
+                                    int scaledValue = value * 1023 / 4095;
+                                    int nextX = chart.Series["ADC"].Points.Count;
+                                    chart.Series["ADC"].Points.AddXY(nextX, scaledValue);
 
-                                int nextX = chart.Series["ADC"].Points.Count;
-                                chart.Series["ADC"].Points.AddXY(nextX, scaledValue);
+                                    if (scaledValue > 500)
+                                        chart.Series["ADC"].Points[nextX].Color = Color.Red;
+                                    else if (scaledValue > 400)
+                                        chart.Series["ADC"].Points[nextX].Color = Color.Yellow;
 
-                                if (scaledValue > 500)
-                                    chart.Series["ADC"].Points[nextX].Color = Color.Red;
-                                else if (scaledValue > 400 && scaledValue <= 500)
-                                    chart.Series["ADC"].Points[nextX].Color = Color.Yellow;
+                                    var area = chart.ChartAreas["MainArea"];
+                                    area.AxisX.Minimum = Math.Max(0, nextX - 100);
+                                    area.AxisX.Maximum = nextX;
 
-                                // Last 100 chart points
-                                var area = chart.ChartAreas["MainArea"];
-                                area.AxisX.Minimum = Math.Max(0, nextX - 100);
-                                area.AxisX.Maximum = nextX;
+                                    last20Values.Enqueue(scaledValue);
+                                    if (last20Values.Count > 20) last20Values.Dequeue();
 
-                                // ListBox last 20 values
-                                last20Values.Enqueue(scaledValue);
-                                if (last20Values.Count > 20) last20Values.Dequeue();
-
-                                listBox1.Items.Clear();                          // please add a listbox1 to the form
-                                foreach (var v in last20Values) listBox1.Items.Add(v);    
-                                listBox1.TopIndex = listBox1.Items.Count - 1;    // scrolled to the end
+                                    listBox1.Items.Clear();
+                                    foreach (var v in last20Values) listBox1.Items.Add(v);
+                                    listBox1.TopIndex = listBox1.Items.Count - 1;
+                                }
                             }
-                        }
-                        else if (line.StartsWith("BTN:"))
-                        {
-                            string payload = line.Substring(4);             // takes 4. index and more (index starts from zero)
-                            listBox2.Items.Add(payload);                    // please add a listbox2 to the form
-                            listBox2.TopIndex = listBox2.Items.Count - 1;   // scrolled to the end
+                            else if (line.StartsWith("BTN:"))
+                            {
+                                string butonCount = line.Substring(4).Trim();
+                                listBox2.Items.Add(butonCount);
+                                listBox2.TopIndex = listBox2.Items.Count - 1;
+                            }
+                            else if (line.StartsWith("LED:"))
+                            {
+                                string payload = line.Substring(4).Trim();
+                                label3.Text = "LED is " + payload;
+                                label3.ForeColor = (payload == "ON") ? Color.Green : Color.Red;
+                            }
                         }
                     }));
                 }
@@ -171,6 +178,8 @@ namespace ilkADCreadFramework
                 MessageBox.Show("Serial read error: " + ex.Message);
             }
         }
+
+
 
 
 
@@ -187,6 +196,20 @@ namespace ilkADCreadFramework
         private void button1_Click(object sender, EventArgs e)
         {
             this.Close();     // button1 located on the form to close the application (location 1650;50) (size 240;80)
+        }
+
+        private void btnLEDon_Click(object sender, EventArgs e)
+        {           
+            serialPort.Write("1");
+            label3.Text = "LED is ON";
+            label3.ForeColor = Color.Green;
+        }
+
+        private void btnLEDoff_Click(object sender, EventArgs e)
+        {          
+            serialPort.Write("0");
+            label3.Text="LED is OFF";
+            label3.ForeColor = Color.Red;
         }
     }
 }

@@ -132,8 +132,13 @@ namespace ilkADCreadFramework
             {
                 if (serialPort != null && serialPort.IsOpen)
                 {
+<<<<<<< HEAD
                     string AllData = serialPort.ReadExisting();
                     string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+=======
+                    string AllData = serialPort.ReadExisting();  // receive all the data
+                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);  // split the lines
+>>>>>>> 1adff10fa07f49bbc00f5887ccec231b1a8e7ef8
 
                     this.Invoke((MethodInvoker)(() =>
                     {
@@ -189,7 +194,7 @@ namespace ilkADCreadFramework
                                 listBox2.Items.Add(butonCount);
                                 listBox2.TopIndex = listBox2.Items.Count - 1;
                             }
-                            else if (line.StartsWith("LED:"))
+                            else if (line.StartsWith("LED:"))  
                             {
                                 string LEDstate = line.Substring(4).Trim();
                                 label3.Text = "LED is " + LEDstate;

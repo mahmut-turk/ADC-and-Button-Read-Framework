@@ -1,4 +1,4 @@
-﻿using RJCP.IO.Ports;
+﻿using RJCPPort = RJCP.IO.Ports;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -12,7 +12,7 @@ namespace ilkADCreadFramework
 {
     public partial class Form1 : Form
     {
-        private SerialPortStream serialPort;
+        RJCPPort.SerialPortStream serialPort;
         private Chart chart;
         private Label statusLabel;
         private Queue<int> last20Values = new Queue<int>();
@@ -22,10 +22,9 @@ namespace ilkADCreadFramework
             InitializeComponent();
             this.Load += Form1_Load;
         }
+
         private void Form1_Load(object sender, EventArgs e)
         {
-             
-
             // Status Label
             statusLabel = new Label
             {
@@ -35,45 +34,56 @@ namespace ilkADCreadFramework
             };
             this.Controls.Add(statusLabel);
 
-            // create a Chart
+            // Chart oluştur
             chart = new Chart
             {
-                //Dock = DockStyle.Top,
                 Height = 400,
                 Width = 1600,
                 Location = new Point(10, 40),
             };
             chart.Anchor = AnchorStyles.Left;
+
             ChartArea area = new ChartArea("MainArea");
             area.AxisY.Minimum = 0;
-            area.AxisY.Maximum = 1023;  
+            area.AxisY.Maximum = 1023;
             area.AxisX.Title = "Time";
-            area.AxisX.TitleFont= new Font("Arial", 12, FontStyle.Bold);
+            area.AxisX.TitleFont = new Font("Arial", 12, FontStyle.Bold);
             area.AxisX.TitleForeColor = Color.Blue;
             area.AxisY.TitleFont = new Font("Arial", 12, FontStyle.Bold);
             area.AxisY.TitleForeColor = Color.Red;
-            area.AxisY.Title = "ADC Value";
+            area.AxisY.Title = "Value";
             chart.ChartAreas.Add(area);
-            Series series = new Series("ADC")
+
+            // ADC Series
+            Series adcSeries = new Series("ADC")
             {
-                ChartType = SeriesChartType.Line
+                ChartType = SeriesChartType.Line,
+                Color = Color.Blue
             };
-            chart.Series.Add(series);
+            chart.Series.Add(adcSeries);
+
+            // ECG Series
+            Series ecgSeries = new Series("ECG")
+            {
+                ChartType = SeriesChartType.Line,
+                Color = Color.Green
+            };
+            chart.Series.Add(ecgSeries);
+
             this.Controls.Add(chart);
 
-            // try to open the COM port
-            OpenSerialPort("COM10", 115200);
-            
+            // --- COM portu manuel belirtiyoruz ---
+            OpenSerialPort("COM11", 115200);
         }
-  
-        private void OpenSerialPort(string portName, int baudRate)      
+
+        private void OpenSerialPort(string portName, int baudRate)
         {
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 int retry = 0;
                 bool success = false;
 
-                while (!success && retry < 2)
+                while (!success && retry < 5)
                 {
                     try
                     {
@@ -83,18 +93,16 @@ namespace ilkADCreadFramework
                             serialPort.Dispose();
                         }
 
-                        serialPort = new SerialPortStream(portName, baudRate);
+                        serialPort = new RJCPPort.SerialPortStream(portName, baudRate);
                         serialPort.DataReceived += SerialPort_DataReceived;
                         serialPort.Open();
 
-                        // wait for Arduino reset
-                        Thread.Sleep(250);
+                        Thread.Sleep(250); // ESP reset beklemesi
 
                         success = true;
                         this.Invoke((MethodInvoker)(() =>
                         {
-                            statusLabel.Text = $"Port {portName} ist opened succesfull";
-                            
+                            statusLabel.Text = $"Port {portName} opened successfully at {baudRate} baud!";
                         }));
                     }
                     catch (Exception ex)
@@ -102,7 +110,7 @@ namespace ilkADCreadFramework
                         retry++;
                         this.Invoke((MethodInvoker)(() =>
                         {
-                            statusLabel.Text = $"Port openning error: {ex.Message} Retry {retry}/2";
+                            statusLabel.Text = $"Port opening error: {ex.Message} Retry {retry}/5";
                         }));
                         Thread.Sleep(500);
                     }
@@ -118,14 +126,14 @@ namespace ilkADCreadFramework
             });
         }
 
-        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        private void SerialPort_DataReceived(object sender, RJCPPort.SerialDataReceivedEventArgs e)
         {
             try
             {
                 if (serialPort != null && serialPort.IsOpen)
                 {
-                    string data = serialPort.ReadExisting(); // tüm mevcut veriyi al
-                    string[] lines = data.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    string AllData = serialPort.ReadExisting();
+                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
                     this.Invoke((MethodInvoker)(() =>
                     {
@@ -157,6 +165,24 @@ namespace ilkADCreadFramework
                                     listBox1.TopIndex = listBox1.Items.Count - 1;
                                 }
                             }
+                            else if (line.StartsWith("ECG:"))
+                            {
+                                string ECGvalue = line.Substring(4).Trim();
+                                if (int.TryParse(ECGvalue, out int ecgValue))
+                                {
+                                    int nextX = chart.Series["ECG"].Points.Count;
+                                    chart.Series["ECG"].Points.AddXY(nextX, ecgValue);
+
+                                    if (ecgValue > 500)
+                                        chart.Series["ECG"].Points[nextX].Color = Color.Red;
+                                    else if (ecgValue > 400)
+                                        chart.Series["ECG"].Points[nextX].Color = Color.Yellow;
+
+                                    var area = chart.ChartAreas["MainArea"];
+                                    area.AxisX.Minimum = Math.Max(0, nextX - 100);
+                                    area.AxisX.Maximum = nextX;
+                                }
+                            }
                             else if (line.StartsWith("BTN:"))
                             {
                                 string butonCount = line.Substring(4).Trim();
@@ -165,9 +191,9 @@ namespace ilkADCreadFramework
                             }
                             else if (line.StartsWith("LED:"))
                             {
-                                string payload = line.Substring(4).Trim();
-                                label3.Text = "LED is " + payload;
-                                label3.ForeColor = (payload == "ON") ? Color.Green : Color.Red;
+                                string LEDstate = line.Substring(4).Trim();
+                                label3.Text = "LED is " + LEDstate;
+                                label3.ForeColor = (LEDstate == "ON") ? Color.Green : Color.Red;
                             }
                         }
                     }));
@@ -179,36 +205,32 @@ namespace ilkADCreadFramework
             }
         }
 
-
-
-
-
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             if (serialPort != null)
             {
                 try { serialPort.Close(); } catch { }
-                serialPort.Dispose();   // free all resources
+                serialPort.Dispose();
             }
             base.OnFormClosing(e);
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            this.Close();     // button1 located on the form to close the application (location 1650;50) (size 240;80)
+            this.Close();
         }
 
         private void btnLEDon_Click(object sender, EventArgs e)
-        {           
+        {
             serialPort.Write("1");
             label3.Text = "LED is ON";
             label3.ForeColor = Color.Green;
         }
 
         private void btnLEDoff_Click(object sender, EventArgs e)
-        {          
+        {
             serialPort.Write("0");
-            label3.Text="LED is OFF";
+            label3.Text = "LED is OFF";
             label3.ForeColor = Color.Red;
         }
     }

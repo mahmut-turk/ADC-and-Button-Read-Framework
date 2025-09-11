@@ -34,7 +34,7 @@ namespace ilkADCreadFramework
             };
             this.Controls.Add(statusLabel);
 
-            // Chart oluştur
+            // create Chart 
             chart = new Chart
             {
                 Height = 400,
@@ -54,7 +54,7 @@ namespace ilkADCreadFramework
             area.AxisY.Title = "Value";
             chart.ChartAreas.Add(area);
 
-            // ADC Series
+            // create ADC Series
             Series adcSeries = new Series("ADC")
             {
                 ChartType = SeriesChartType.Line,
@@ -62,7 +62,7 @@ namespace ilkADCreadFramework
             };
             chart.Series.Add(adcSeries);
 
-            // ECG Series
+            // create ECG Series
             Series ecgSeries = new Series("ECG")
             {
                 ChartType = SeriesChartType.Line,
@@ -72,7 +72,7 @@ namespace ilkADCreadFramework
 
             this.Controls.Add(chart);
 
-            // --- COM portu manuel belirtiyoruz ---
+            // --- specify COM port manuel ---
             OpenSerialPort("COM11", 115200);
         }
 
@@ -97,7 +97,7 @@ namespace ilkADCreadFramework
                         serialPort.DataReceived += SerialPort_DataReceived;
                         serialPort.Open();
 
-                        Thread.Sleep(250); // ESP reset beklemesi
+                        Thread.Sleep(250); // ESP reset awaiting
 
                         success = true;
                         this.Invoke((MethodInvoker)(() =>
@@ -132,15 +132,8 @@ namespace ilkADCreadFramework
             {
                 if (serialPort != null && serialPort.IsOpen)
                 {
-<<<<<<< HEAD
-                    string AllData = serialPort.ReadExisting();
-                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-=======
-                    string AllData = serialPort.ReadExisting();  // receive all the data
-                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);  // split the lines
->>>>>>> 1adff10fa07f49bbc00f5887ccec231b1a8e7ef8
-                    string AllData = serialPort.ReadExisting();  // receive all the data
-                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);  // split the lines
+                    string AllData = serialPort.ReadExisting();                                                    // receive all the data
+                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);   // split the lines
 
                     this.Invoke((MethodInvoker)(() =>
                     {

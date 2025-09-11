@@ -139,6 +139,8 @@ namespace ilkADCreadFramework
                     string AllData = serialPort.ReadExisting();  // receive all the data
                     string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);  // split the lines
 >>>>>>> 1adff10fa07f49bbc00f5887ccec231b1a8e7ef8
+                    string AllData = serialPort.ReadExisting();  // receive all the data
+                    string[] lines = AllData.Split(new[] { "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);  // split the lines
 
                     this.Invoke((MethodInvoker)(() =>
                     {
